@@ -224,6 +224,17 @@ button.primary:hover { opacity: 0.92; }
   gap: 10px;
 }
 
+.upload-state {
+  margin: 10px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.upload-state.pending { color: #8b5e00; }
+.upload-state.ok { color: #0f6f4d; }
+.upload-state.fail { color: #b03030; }
+.upload-state.warn { color: #8b5e00; }
+
 .wrong-item {
   padding: 10px;
   border: 1px solid var(--border);
@@ -239,6 +250,25 @@ button.primary:hover { opacity: 0.92; }
   align-items: baseline;
   gap: 6px;
   margin-bottom: 4px;
+}
+
+.admin-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-record summary {
+  cursor: pointer;
+  line-height: 1.8;
+}
+
+.admin-detail-wrap {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
 }
 
 @media (max-width: 860px) {

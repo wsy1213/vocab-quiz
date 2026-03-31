@@ -13,6 +13,17 @@ const state = {
 
 const el = (id) => document.getElementById(id);
 
+function getSupabaseClient() {
+  const cfg = window.APP_CONFIG || {};
+  if (!cfg.supabaseUrl || !cfg.supabaseAnonKey || cfg.supabaseUrl.includes('YOUR_')) {
+    return null;
+  }
+  if (!window.supabase || !window.supabase.createClient) {
+    return null;
+  }
+  return window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+}
+
 function formatTime(sec) {
   const m = String(Math.floor(sec / 60)).padStart(2, '0');
   const s = String(sec % 60).padStart(2, '0');
@@ -111,6 +122,37 @@ function renderQuestions() {
   });
 }
 
+async function uploadResult(payload) {
+  const statusEl = el('uploadState');
+  if (statusEl) {
+    statusEl.textContent = '成绩上传状态：上传中...';
+    statusEl.className = 'upload-state pending';
+  }
+
+  const client = getSupabaseClient();
+  if (!client) {
+    if (statusEl) {
+      statusEl.textContent = '成绩上传状态：未配置 Supabase（请填写 config.js）';
+      statusEl.className = 'upload-state warn';
+    }
+    return;
+  }
+
+  const { error } = await client.from('exam_results').insert(payload);
+  if (error) {
+    if (statusEl) {
+      statusEl.textContent = `成绩上传状态：失败（${error.message}）`;
+      statusEl.className = 'upload-state fail';
+    }
+    return;
+  }
+
+  if (statusEl) {
+    statusEl.textContent = '成绩上传状态：已上传';
+    statusEl.className = 'upload-state ok';
+  }
+}
+
 function submitExam(isAuto = false) {
   if (state.submitted) return;
   state.submitted = true;
@@ -162,6 +204,16 @@ function submitExam(isAuto = false) {
 
   el('quiz').classList.add('hidden');
   el('result').classList.remove('hidden');
+
+  uploadResult({
+    group_no: state.currentGroup,
+    total_count: total,
+    correct_count: correct,
+    used_time: used,
+    is_auto_submit: isAuto,
+    submit_time: formatDateTime(endTime),
+    details: detailList
+  });
 }
 
 function startExam() {
@@ -221,6 +273,11 @@ async function init() {
     el('result').classList.add('hidden');
     el('setup').classList.remove('hidden');
     el('timer').textContent = formatTime(state.durationMin * 60);
+    const statusEl = el('uploadState');
+    if (statusEl) {
+      statusEl.textContent = '成绩上传状态：未开始';
+      statusEl.className = 'upload-state';
+    }
   });
 }
 

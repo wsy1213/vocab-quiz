@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CET-4 测试记录后台</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div>
+        <h1>测试记录后台</h1>
+        <p class="sub">查看所有交卷记录与答题明细</p>
+      </div>
+      <div class="actions">
+        <button id="refreshBtn" class="primary">刷新记录</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="admin-meta">
+        <span id="totalCount">总记录：0</span>
+        <span id="loadState" class="hint">加载中...</span>
+      </div>
+      <div id="recordList" class="wrong-list"></div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

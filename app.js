@@ -12,6 +12,7 @@ const state = {
 };
 
 const el = (id) => document.getElementById(id);
+const CLIENT_ID_KEY = 'vocab_quiz_client_id';
 
 function getSupabaseClient() {
   const cfg = window.APP_CONFIG || {};
@@ -22,6 +23,36 @@ function getSupabaseClient() {
     return null;
   }
   return window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+}
+
+function getOrCreateClientId() {
+  try {
+    const existing = localStorage.getItem(CLIENT_ID_KEY);
+    if (existing) return existing;
+    const id = (window.crypto && window.crypto.randomUUID)
+      ? window.crypto.randomUUID()
+      : `cid_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(CLIENT_ID_KEY, id);
+    return id;
+  } catch (_) {
+    return `cid_fallback_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
+function getClientInfo() {
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  const language = navigator.language || '';
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  const deviceName = `${platform || 'Unknown Platform'} / ${language || 'Unknown Language'}`;
+  return {
+    client_id: getOrCreateClientId(),
+    device_name: deviceName,
+    user_agent: ua,
+    platform,
+    language,
+    timezone
+  };
 }
 
 function formatTime(sec) {
@@ -212,7 +243,8 @@ function submitExam(isAuto = false) {
     used_time: used,
     is_auto_submit: isAuto,
     submit_time: formatDateTime(endTime),
-    details: detailList
+    details: detailList,
+    ...getClientInfo()
   });
 }
 

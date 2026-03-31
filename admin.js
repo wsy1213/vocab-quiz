@@ -63,6 +63,8 @@ function render(records) {
         用时：${escapeHtml(r.used_time || "-")}
       </summary>
       <div class="admin-detail-wrap">
+        <div class="hint">设备：${escapeHtml(r.device_name || "未知设备")} | 设备ID：${escapeHtml(r.client_id || "-")}</div>
+        <div class="hint">系统：${escapeHtml(r.platform || "-")} | 语言：${escapeHtml(r.language || "-")} | 时区：${escapeHtml(r.timezone || "-")}</div>
         ${detailHtml || "<div class='hint'>该记录没有答题明细</div>"}
       </div>
     `;
@@ -80,7 +82,7 @@ async function loadRecords() {
 
   const { data, error } = await client
     .from("exam_results")
-    .select("id, submit_time, group_no, total_count, used_time, details")
+    .select("id, submit_time, group_no, total_count, used_time, details, client_id, device_name, user_agent, platform, language, timezone")
     .order("created_at", { ascending: false })
     .limit(200);
 

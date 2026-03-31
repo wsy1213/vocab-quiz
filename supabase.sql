@@ -9,6 +9,12 @@ create table if not exists public.exam_results (
   correct_count int not null,
   used_time text not null,
   is_auto_submit boolean not null default false,
+  client_id text,
+  device_name text,
+  user_agent text,
+  platform text,
+  language text,
+  timezone text,
   details jsonb not null default '[]'::jsonb
 );
 

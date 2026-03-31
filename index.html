@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CET-4 词汇测试</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div>
+        <h1>CET-4 词汇测试</h1>
+        <p class="sub">每组 375 个单词，随机抽取 100 个，30 分钟计时</p>
+      </div>
+      <div class="timer" id="timer">30:00</div>
+    </header>
+
+    <section id="setup" class="card">
+      <h2>开始测试</h2>
+      <div class="row">
+        <label for="groupSelect">选择组别</label>
+        <select id="groupSelect"></select>
+      </div>
+      <div class="row">
+        <label for="sampleCount">抽题数量</label>
+        <input id="sampleCount" type="number" min="1" max="100" value="100" />
+        <span class="hint">默认 100（若本组不足 100，则全部抽取）</span>
+      </div>
+      <div class="row">
+        <label for="duration">考试时长</label>
+        <input id="duration" type="number" min="1" max="60" value="30" />
+        <span class="hint">单位：分钟</span>
+      </div>
+      <div class="row">
+        <button id="startBtn" class="primary">开始考试</button>
+      </div>
+      <p class="rule">评分规则：你的答案与释义中的任一片段匹配即视为正确（忽略空格与标点）。</p>
+    </section>
+
+    <section id="quiz" class="hidden">
+      <div class="layout">
+        <aside class="card directory">
+          <h3>目录</h3>
+          <div id="dirList" class="dir-list"></div>
+          <div class="dir-legend">
+            <span class="legend"><i class="dot unanswered"></i>未答</span>
+            <span class="legend"><i class="dot answered"></i>已答</span>
+          </div>
+          <button id="submitBtn" class="primary">交卷</button>
+        </aside>
+
+        <main class="card questions" id="questionList"></main>
+      </div>
+    </section>
+
+    <section id="result" class="card hidden">
+      <h2>成绩</h2>
+      <div class="score" id="scoreText"></div>
+      <div class="meta" id="metaText"></div>
+      <div class="status-legend">
+        <span class="legend"><i class="dot correct"></i>对</span>
+        <span class="legend"><i class="dot wrong"></i>错</span>
+        <span class="legend"><i class="dot blank"></i>未答</span>
+      </div>
+      <h3>答题明细</h3>
+      <div id="wrongList" class="wrong-list"></div>
+      <button id="restartBtn">再来一套</button>
+    </section>
+  </div>
+
+  <script src="data/words.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

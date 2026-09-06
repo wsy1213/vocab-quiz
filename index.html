@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CET-4 词汇测试</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>CET 词汇测试</title>
+  <link rel="stylesheet" href="styles.css?v=202609061810" />
 </head>
 <body>
   <div class="app">
     <header class="header">
       <div>
-        <h1>CET-4 词汇测试</h1>
-        <p class="sub">每组 375 个单词，随机抽取 100 个，30 分钟计时</p>
+        <h1 id="appTitle">CET-4 词汇测试</h1>
+        <p class="sub" id="appSub">每组 375 个单词，随机抽取 100 个，30 分钟计时</p>
       </div>
       <div class="timer" id="timer">30:00</div>
     </header>
@@ -19,13 +19,22 @@
     <section id="setup" class="card">
       <h2>开始测试</h2>
       <div class="row">
+        <label for="modeSelect">考试模式</label>
+        <select id="modeSelect">
+          <option value="cet4">四级考核</option>
+          <option value="cet4ReviewQxh">四级复习考核（齐小涵）</option>
+          <option value="cet4ReviewWlh">四级复习考核（武琳昊）</option>
+          <option value="cet6">六级考核</option>
+        </select>
+      </div>
+      <div class="row">
         <label for="groupSelect">选择组别</label>
         <select id="groupSelect"></select>
       </div>
       <div class="row">
         <label for="sampleCount">抽题数量</label>
         <input id="sampleCount" type="number" min="1" max="100" value="100" />
-        <span class="hint">默认 100（若本组不足 100，则全部抽取）</span>
+        <span class="hint" id="sampleHint">默认 100（若本组不足 100，则全部抽取）</span>
       </div>
       <div class="row">
         <label for="duration">考试时长</label>
@@ -35,7 +44,28 @@
       <div class="row">
         <button id="startBtn" class="primary">开始考试</button>
       </div>
-      <p class="rule">评分规则：你的答案与释义中的任一片段匹配即视为正确（忽略空格与标点）。</p>
+      <p class="rule" id="modeRule">评分规则：你的答案与释义中的任一片段匹配即视为正确（忽略空格与标点）。</p>
+    </section>
+
+    <section id="history" class="card history-card">
+      <div class="history-head">
+        <div>
+          <h2>四级复习考核记录</h2>
+          <p class="sub">用于半月考核结算，显示齐小涵和武琳昊的四级复习成绩</p>
+        </div>
+        <button id="historyRefreshBtn" class="primary">刷新记录</button>
+      </div>
+      <div class="row">
+        <label for="historyPersonSelect">查看对象</label>
+        <select id="historyPersonSelect">
+          <option value="all">全部</option>
+          <option value="cet4ReviewQxh">齐小涵</option>
+          <option value="cet4ReviewWlh">武琳昊</option>
+        </select>
+        <span id="historyState" class="hint">尚未加载</span>
+      </div>
+      <div id="historySummary" class="history-summary"></div>
+      <div id="historyList" class="history-list"></div>
     </section>
 
     <section id="quiz" class="hidden">
@@ -70,9 +100,10 @@
     </section>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.103.0/dist/umd/supabase.js"></script>
   <script src="config.js?v=202603311700"></script>
   <script src="data/words.js?v=202603311700"></script>
-  <script src="app.js?v=202603311700"></script>
+  <script src="data/cet6_words.js?v=202609061724"></script>
+  <script src="app.js?v=202609061810"></script>
 </body>
 </html>

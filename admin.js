@@ -80,19 +80,23 @@ async function loadRecords() {
 
   el("loadState").textContent = "加载中...";
 
-  const { data, error } = await client
-    .from("exam_results")
-    .select("id, submit_time, group_no, total_count, used_time, details, client_id, device_name, user_agent, platform, language, timezone")
-    .order("created_at", { ascending: false })
-    .limit(200);
+  try {
+    const { data, error } = await client
+      .from("exam_results")
+      .select("id, submit_time, group_no, total_count, used_time, details, client_id, device_name, user_agent, platform, language, timezone")
+      .order("created_at", { ascending: false })
+      .limit(200);
 
-  if (error) {
-    el("loadState").textContent = `加载失败：${error.message}`;
-    return;
+    if (error) {
+      el("loadState").textContent = `加载失败：${error.message}`;
+      return;
+    }
+
+    render(data || []);
+    el("loadState").textContent = "加载完成";
+  } catch (e) {
+    el("loadState").textContent = `加载失败：${e.message}（可能 Supabase 项目已暂停，请到 Dashboard 恢复）`;
   }
-
-  render(data || []);
-  el("loadState").textContent = "加载完成";
 }
 
 el("refreshBtn").addEventListener("click", loadRecords);

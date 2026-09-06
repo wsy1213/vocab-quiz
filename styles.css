@@ -174,9 +174,24 @@ button.primary:hover { opacity: 0.92; }
 
 .q-index { color: var(--muted); }
 
+.q-type {
+  color: #0a6b5c;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #b9dcd4;
+  background: #edf8f3;
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
 .q-word { font-size: 18px; font-weight: 600; }
 
 .q-phonetic { color: var(--muted); }
+
+.q-meaning-prompt {
+  margin-top: 8px;
+  line-height: 1.7;
+}
 
 .answer {
   margin-top: 8px;
@@ -251,6 +266,74 @@ button.primary:hover { opacity: 0.92; }
   gap: 6px;
   margin-bottom: 4px;
 }
+
+.history-card {
+  margin-top: 16px;
+}
+
+.history-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.history-head h2 {
+  margin-top: 0;
+}
+
+.history-summary {
+  margin: 10px 0 12px;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+}
+
+.history-record {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+}
+
+.history-record summary {
+  cursor: pointer;
+  line-height: 1.8;
+}
+
+.history-score {
+  display: inline-block;
+  min-width: 58px;
+  color: #0f2f2b;
+  background: #e8f3ef;
+  border: 1px solid #cfe6dc;
+  border-radius: 6px;
+  padding: 1px 6px;
+  margin-right: 6px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.history-detail-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.history-detail {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 14px;
+}
+
+.history-detail.correct { border-color: #9bd3c7; background: #edf8f3; }
+.history-detail.wrong { border-color: #e0a0a0; background: #fdecec; }
+.history-detail.blank { border-color: #f0c26c; background: #fff6e3; }
 
 .admin-meta {
   display: flex;

@@ -1,4 +1,6 @@
 const state = {
+  mode: 'cet4',
+  dataByMode: {},
   words: [],
   groupSize: 375,
   currentGroup: 1,
@@ -13,6 +15,61 @@ const state = {
 
 const el = (id) => document.getElementById(id);
 const CLIENT_ID_KEY = 'vocab_quiz_client_id';
+const REVIEW_MODES = ['cet4ReviewQxh', 'cet4ReviewWlh'];
+const MODES = {
+  cet4: {
+    title: 'CET-4 词汇测试',
+    sub: '每组 375 个单词，随机抽取 100 个，30 分钟计时',
+    label: '四级考核',
+    dataKey: 'cet4',
+    groupSize: 375,
+    sampleDefault: 100,
+    sampleMax: 100,
+    sampleDisabled: false,
+    hanToEngRatio: 0,
+    sampleHint: '默认 100（若本组不足 100，则全部抽取）',
+    rule: '评分规则：你的答案与释义中的任一片段匹配即视为正确（忽略空格与标点）。'
+  },
+  cet4ReviewQxh: {
+    title: 'CET-4 复习考核（齐小涵）',
+    sub: '按原四级词表顺序切成 45 组，每组 100 个，组内乱序作答',
+    label: '四级复习考核（齐小涵）',
+    dataKey: 'cet4',
+    groupSize: 100,
+    sampleDefault: 100,
+    sampleMax: 100,
+    sampleDisabled: true,
+    hanToEngRatio: 0.3,
+    sampleHint: '复习模式固定整组考核；最后一组不足 100 个则全部考',
+    rule: '四级复习考核沿用四级考核的单词原始顺序分组，开考后组内乱序；题型为英译汉和汉译英混合，强化拼写与释义掌握。'
+  },
+  cet4ReviewWlh: {
+    title: 'CET-4 复习考核（武琳昊）',
+    sub: '按原四级词表顺序切组，每组 60 个，组内乱序作答',
+    label: '四级复习考核（武琳昊）',
+    dataKey: 'cet4',
+    groupSize: 60,
+    sampleDefault: 60,
+    sampleMax: 60,
+    sampleDisabled: true,
+    hanToEngRatio: 0.3,
+    sampleHint: '武琳昊模式固定整组考核；最后一组不足 60 个则全部考',
+    rule: '武琳昊四级复习模式沿用四级考核的单词原始顺序分组，开考后组内乱序；题型为英译汉和汉译英混合，强化拼写与释义掌握。'
+  },
+  cet6: {
+    title: 'CET-6 词汇测试',
+    sub: '已去除四级重复词，按 PDF 顺序每 200 个分组，随机抽取 100 个，30 分钟计时',
+    label: '六级考核',
+    dataKey: 'cet6',
+    groupSize: 200,
+    sampleDefault: 100,
+    sampleMax: 100,
+    sampleDisabled: false,
+    hanToEngRatio: 0,
+    sampleHint: '默认从本组 200 个词里随机抽 100 个（最后一组不足 100 个则全部抽取）',
+    rule: '六级词表来自 PDF 抽取结果，已去除四级重复词并补充音标；选择组别按 PDF 顺序每 200 个词划分，开考后随机抽题并乱序。'
+  }
+};
 
 function getSupabaseClient() {
   const cfg = window.APP_CONFIG || {};
@@ -99,6 +156,19 @@ function isCorrect(answer, meaning) {
   return tokens.some(t => t && (t.includes(a) || a.includes(t)));
 }
 
+function isWordCorrect(answer, word) {
+  return normalize(answer) === normalize(word);
+}
+
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function updateTimer() {
   const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
   const left = Math.max(0, state.durationMin * 60 - elapsed);
@@ -133,14 +203,26 @@ function renderQuestions() {
     const wrap = document.createElement('div');
     wrap.className = 'question';
     wrap.id = `q-${idx}`;
-    wrap.innerHTML = `
-      <div class="q-head">
-        <div class="q-index">${idx + 1}.</div>
-        <div class="q-word">${q.word}</div>
-        <div class="q-phonetic">${q.phonetic || ''}</div>
-      </div>
-      <input class="answer" type="text" placeholder="填写中文意思" data-idx="${idx}" />
-    `;
+    if (q.direction === 'zhToEn') {
+      wrap.innerHTML = `
+        <div class="q-head">
+          <div class="q-index">${idx + 1}.</div>
+          <div class="q-type">汉译英</div>
+        </div>
+        <div class="q-meaning-prompt">${q.meaning}</div>
+        <input class="answer" type="text" placeholder="填写英文单词" data-idx="${idx}" />
+      `;
+    } else {
+      wrap.innerHTML = `
+        <div class="q-head">
+          <div class="q-index">${idx + 1}.</div>
+          <div class="q-type">英译汉</div>
+          <div class="q-word">${q.word}</div>
+          <div class="q-phonetic">${q.phonetic || ''}</div>
+        </div>
+        <input class="answer" type="text" placeholder="填写中文意思" data-idx="${idx}" />
+      `;
+    }
     container.appendChild(wrap);
   });
 
@@ -151,6 +233,54 @@ function renderQuestions() {
     state.answers[idx] = t.value;
     renderDirectory();
   });
+}
+
+function buildQuestions(groupItems, pickCount, cfg) {
+  const picked = shuffle(groupItems).slice(0, pickCount).map(item => ({ ...item, direction: 'enToZh' }));
+  const hanToEngCount = Math.round(picked.length * (cfg.hanToEngRatio || 0));
+  shuffle(picked.map((_, idx) => idx)).slice(0, hanToEngCount).forEach(idx => {
+    picked[idx].direction = 'zhToEn';
+  });
+  return picked;
+}
+
+function getModeConfig() {
+  return MODES[state.mode] || MODES.cet4;
+}
+
+function getTotalGroups() {
+  return Math.ceil(state.words.length / state.groupSize);
+}
+
+function populateGroups() {
+  const totalGroups = getTotalGroups();
+  const select = el('groupSelect');
+  select.innerHTML = '';
+  for (let i = 1; i <= totalGroups; i++) {
+    const start = (i - 1) * state.groupSize + 1;
+    const end = Math.min(i * state.groupSize, state.words.length);
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = `第 ${i} 组（${start}-${end}）`;
+    select.appendChild(opt);
+  }
+}
+
+function applyMode(mode) {
+  state.mode = mode === 'cet4Review' ? 'cet4ReviewQxh' : mode;
+  const cfg = getModeConfig();
+  const data = state.dataByMode[cfg.dataKey] || { items: [] };
+  state.words = data.items || [];
+  state.groupSize = cfg.groupSize || data.groupSize || 100;
+
+  el('appTitle').textContent = cfg.title;
+  el('appSub').textContent = cfg.sub;
+  el('sampleCount').value = String(cfg.sampleDefault);
+  el('sampleCount').max = String(cfg.sampleMax);
+  el('sampleCount').disabled = Boolean(cfg.sampleDisabled);
+  el('sampleHint').textContent = cfg.sampleHint;
+  el('modeRule').textContent = cfg.rule;
+  populateGroups();
 }
 
 async function uploadResult(payload) {
@@ -169,7 +299,12 @@ async function uploadResult(payload) {
     return;
   }
 
-  const { error } = await client.from('exam_results').insert(payload);
+  let { error } = await client.from('exam_results').insert(payload);
+  if (error && /exam_mode|exam_mode_label|column/i.test(error.message || '')) {
+    const { exam_mode, exam_mode_label, ...fallbackPayload } = payload;
+    const retry = await client.from('exam_results').insert(fallbackPayload);
+    error = retry.error;
+  }
   if (error) {
     if (statusEl) {
       statusEl.textContent = `成绩上传状态：失败（${error.message}）`;
@@ -184,6 +319,133 @@ async function uploadResult(payload) {
   }
 }
 
+function getRecordMode(record) {
+  if (record.exam_mode) return record.exam_mode;
+  const details = Array.isArray(record.details) ? record.details : [];
+  const hasMixedReviewType = details.some(item => item.direction === 'zhToEn' || item.direction === 'enToZh');
+  if (!hasMixedReviewType) return '';
+  if (Number(record.total_count) === 60) return 'cet4ReviewWlh';
+  if (Number(record.total_count) === 100) return 'cet4ReviewQxh';
+  return '';
+}
+
+function getRecordModeLabel(record) {
+  const mode = getRecordMode(record);
+  return record.exam_mode_label || (MODES[mode] ? MODES[mode].label : '未知模式');
+}
+
+function getRecordCorrectCount(record) {
+  if (typeof record.correct_count === 'number') return record.correct_count;
+  const details = Array.isArray(record.details) ? record.details : [];
+  return details.filter(item => item.status === 'correct').length;
+}
+
+function renderHistory(records) {
+  const list = el('historyList');
+  const summary = el('historySummary');
+  list.innerHTML = '';
+
+  if (!records.length) {
+    summary.textContent = '暂无四级复习考核记录';
+    list.innerHTML = '<div class="hint">完成一次齐小涵或武琳昊四级复习考核并成功上传后，会显示在这里。</div>';
+    return;
+  }
+
+  const totalExams = records.length;
+  const avgScore = Math.round(records.reduce((sum, r) => {
+    const total = Number(r.total_count) || 0;
+    return sum + (total ? getRecordCorrectCount(r) / total * 100 : 0);
+  }, 0) / totalExams);
+  const latest = records[0];
+  summary.textContent = `共 ${totalExams} 次记录，平均 ${avgScore} 分；最近一次：${getRecordModeLabel(latest)} 第 ${Number(latest.group_no) || '-'} 组`;
+
+  records.forEach(record => {
+    const details = Array.isArray(record.details) ? record.details : [];
+    const correct = getRecordCorrectCount(record);
+    const total = Number(record.total_count) || details.length || 0;
+    const score = total ? Math.round(correct / total * 100) : 0;
+    const wrongCount = details.filter(item => item.status !== 'correct').length;
+    const modeLabel = getRecordModeLabel(record);
+    const detailHtml = details.map(item => {
+      const typeLabel = item.direction === 'zhToEn' ? '汉译英' : '英译汉';
+      return `
+        <div class="history-detail ${escapeHtml(item.status)}">
+          <div class="detail-head">
+            <span class="status-tag ${escapeHtml(item.status)}">${item.status === 'correct' ? '对' : item.status === 'wrong' ? '错' : '未答'}</span>
+            <span class="q-type">${typeLabel}</span>
+            <strong>${escapeHtml(item.index)}. ${escapeHtml(item.word)}</strong>
+            <span class="q-phonetic">${escapeHtml(item.phonetic || '')}</span>
+          </div>
+          <div>答案：${escapeHtml(item.answer || '（空）')}</div>
+          <div>正确：${escapeHtml(item.direction === 'zhToEn' ? item.word : item.meaning)}</div>
+        </div>
+      `;
+    }).join('');
+
+    const wrap = document.createElement('details');
+    wrap.className = 'history-record';
+    wrap.innerHTML = `
+      <summary>
+        <span class="history-score">${score} 分</span>
+        <strong>${escapeHtml(modeLabel)}</strong>
+        <span class="meta-split">|</span>
+        第 ${Number(record.group_no) || '-'} 组
+        <span class="meta-split">|</span>
+        ${correct} / ${total}
+        <span class="meta-split">|</span>
+        错/未答 ${wrongCount}
+        <span class="meta-split">|</span>
+        ${escapeHtml(record.submit_time || '')}
+        <span class="meta-split">|</span>
+        用时 ${escapeHtml(record.used_time || '-')}
+      </summary>
+      <div class="history-detail-list">
+        ${detailHtml || '<div class="hint">该记录没有答题明细</div>'}
+      </div>
+    `;
+    list.appendChild(wrap);
+  });
+}
+
+async function loadHistory() {
+  const statusEl = el('historyState');
+  const person = el('historyPersonSelect').value;
+  const client = getSupabaseClient();
+  if (!client) {
+    statusEl.textContent = '未配置 Supabase，无法读取历史记录';
+    renderHistory([]);
+    return;
+  }
+
+  statusEl.textContent = '加载中...';
+  let query = 'id, created_at, submit_time, group_no, total_count, correct_count, used_time, details, exam_mode, exam_mode_label';
+  let result = await client
+    .from('exam_results')
+    .select(query)
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (result.error && /exam_mode|exam_mode_label|column/i.test(result.error.message || '')) {
+    result = await client
+      .from('exam_results')
+      .select('id, created_at, submit_time, group_no, total_count, correct_count, used_time, details')
+      .order('created_at', { ascending: false })
+      .limit(200);
+  }
+
+  if (result.error) {
+    statusEl.textContent = `加载失败：${result.error.message}`;
+    renderHistory([]);
+    return;
+  }
+
+  const records = (result.data || [])
+    .filter(record => REVIEW_MODES.includes(getRecordMode(record)))
+    .filter(record => person === 'all' || getRecordMode(record) === person);
+  statusEl.textContent = `已加载 ${records.length} 条`;
+  renderHistory(records);
+}
+
 function submitExam(isAuto = false) {
   if (state.submitted) return;
   state.submitted = true;
@@ -195,11 +457,14 @@ function submitExam(isAuto = false) {
 
   state.questions.forEach((q, idx) => {
     const ans = state.answers[idx] || '';
-    const ok = isCorrect(ans, q.meaning);
+    const ok = q.direction === 'zhToEn'
+      ? isWordCorrect(ans, q.word)
+      : isCorrect(ans, q.meaning);
     const answered = normalize(ans).length > 0;
     if (ok) correct += 1;
     detailList.push({
       index: idx + 1,
+      direction: q.direction,
       word: q.word,
       phonetic: q.phonetic,
       meaning: q.meaning,
@@ -213,7 +478,8 @@ function submitExam(isAuto = false) {
   const endTime = new Date();
 
   el('scoreText').textContent = `得分：${correct} / ${total}`;
-  el('metaText').innerHTML = `<span class="time-strong">交卷时间：${formatDateTime(endTime)}</span> <span class="meta-split">|</span> 组别：第 ${state.currentGroup} 组 <span class="meta-split">|</span> 用时：${used} <span class="meta-split">|</span> ${isAuto ? '已到时间自动交卷' : '手动交卷'}`;
+  const cfg = getModeConfig();
+  el('metaText').innerHTML = `<span class="time-strong">交卷时间：${formatDateTime(endTime)}</span> <span class="meta-split">|</span> 模式：${cfg.label} <span class="meta-split">|</span> 组别：第 ${state.currentGroup} 组 <span class="meta-split">|</span> 用时：${used} <span class="meta-split">|</span> ${isAuto ? '已到时间自动交卷' : '手动交卷'}`;
 
   const list = el('wrongList');
   list.innerHTML = '';
@@ -221,9 +487,11 @@ function submitExam(isAuto = false) {
     const div = document.createElement('div');
     div.className = `wrong-item ${item.status}`;
     const label = item.status === 'correct' ? '对' : item.status === 'wrong' ? '错' : '未答';
+    const typeLabel = item.direction === 'zhToEn' ? '汉译英' : '英译汉';
     div.innerHTML = `
       <div class="detail-head">
         <span class="status-tag ${item.status}">${label}</span>
+        <span class="q-type">${typeLabel}</span>
         <strong>${item.index}. ${item.word}</strong>
         <span class="q-phonetic">${item.phonetic || ''}</span>
       </div>
@@ -237,6 +505,8 @@ function submitExam(isAuto = false) {
   el('result').classList.remove('hidden');
 
   uploadResult({
+    exam_mode: state.mode,
+    exam_mode_label: cfg.label,
     group_no: state.currentGroup,
     total_count: total,
     correct_count: correct,
@@ -250,9 +520,12 @@ function submitExam(isAuto = false) {
 
 function startExam() {
   state.submitted = false;
+  const cfg = getModeConfig();
   const groupNo = Number(el('groupSelect').value);
   state.currentGroup = groupNo;
-  state.sampleCount = Math.max(1, Number(el('sampleCount').value) || 100);
+  state.sampleCount = cfg.sampleDisabled
+    ? cfg.sampleDefault
+    : Math.min(cfg.sampleMax, Math.max(1, Number(el('sampleCount').value) || cfg.sampleDefault));
   state.durationMin = Math.max(1, Number(el('duration').value) || 30);
 
   const startIdx = (groupNo - 1) * state.groupSize;
@@ -260,7 +533,7 @@ function startExam() {
   const groupItems = state.words.slice(startIdx, endIdx);
 
   const pickCount = Math.min(groupItems.length, state.sampleCount);
-  state.questions = shuffle(groupItems).slice(0, pickCount);
+  state.questions = buildQuestions(groupItems, pickCount, cfg);
   state.answers = Array(state.questions.length).fill('');
 
   el('setup').classList.add('hidden');
@@ -277,26 +550,24 @@ function startExam() {
 }
 
 async function init() {
-  let data = null;
+  let cet4Data = null;
   if (window.WORDS_DATA) {
-    data = window.WORDS_DATA;
+    cet4Data = window.WORDS_DATA;
   } else {
     const res = await fetch('data/words.json');
-    data = await res.json();
+    cet4Data = await res.json();
   }
-  state.words = data.items || [];
-  state.groupSize = data.groupSize || 375;
+  state.dataByMode = {
+    cet4: cet4Data,
+    cet6: window.CET6_WORDS_DATA || { items: [], groupSize: 100 }
+  };
 
-  const totalGroups = Math.ceil(state.words.length / state.groupSize);
-  const select = el('groupSelect');
-  select.innerHTML = '';
-  for (let i = 1; i <= totalGroups; i++) {
-    const opt = document.createElement('option');
-    opt.value = String(i);
-    opt.textContent = `第 ${i} 组`;
-    select.appendChild(opt);
-  }
+  applyMode(el('modeSelect').value || 'cet4');
 
+  el('modeSelect').addEventListener('change', (e) => applyMode(e.target.value));
+  el('historyRefreshBtn').addEventListener('click', loadHistory);
+  el('historyPersonSelect').addEventListener('change', loadHistory);
+  loadHistory();
   el('startBtn').addEventListener('click', startExam);
   el('submitBtn').addEventListener('click', () => {
     if (confirm('确定要交卷吗？')) submitExam(false);

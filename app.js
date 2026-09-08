@@ -427,9 +427,21 @@ function getRecordModeLabel(record) {
   return record.exam_mode_label || (MODES[mode] ? MODES[mode].label : '未知模式');
 }
 
-function getRecordCorrectCount(record) {
-  if (typeof record.correct_count === 'number') return record.correct_count;
+function getReviewedDetails(record) {
   const details = Array.isArray(record.details) ? record.details : [];
+  return details.map(item => {
+    const answer = item.answer || '';
+    const answered = normalize(answer).length > 0;
+    return {
+      ...item,
+      status: answered ? judgeAnswer(answer, item) : 'blank'
+    };
+  });
+}
+
+function getRecordCorrectCount(record) {
+  const details = getReviewedDetails(record);
+  if (!details.length && typeof record.correct_count === 'number') return record.correct_count;
   return details.filter(isDetailCorrect).length;
 }
 
@@ -476,7 +488,7 @@ function renderHistory(records) {
   summary.textContent = `共 ${totalExams} 次记录，平均 ${avgScore} 分；最近一次：${getRecordModeLabel(latest)} 第 ${Number(latest.group_no) || '-'} 组`;
 
   records.forEach(record => {
-    const details = Array.isArray(record.details) ? record.details : [];
+    const details = getReviewedDetails(record);
     const correct = getRecordCorrectCount(record);
     const total = Number(record.total_count) || details.length || 0;
     const score = total ? Math.round(correct / total * 100) : 0;

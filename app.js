@@ -341,6 +341,18 @@ function getRecordCorrectCount(record) {
   return details.filter(item => item.status === 'correct').length;
 }
 
+function getQuestionPrompt(item) {
+  return item.direction === 'zhToEn' ? item.meaning : item.word;
+}
+
+function getCorrectAnswer(item) {
+  return item.direction === 'zhToEn' ? item.word : item.meaning;
+}
+
+function getDetailPhoneticHtml(item) {
+  return item.direction === 'zhToEn' ? '' : `<span class="q-phonetic">${escapeHtml(item.phonetic || '')}</span>`;
+}
+
 function renderHistory(records) {
   const list = el('historyList');
   const summary = el('historySummary');
@@ -374,11 +386,11 @@ function renderHistory(records) {
           <div class="detail-head">
             <span class="status-tag ${escapeHtml(item.status)}">${item.status === 'correct' ? '对' : item.status === 'wrong' ? '错' : '未答'}</span>
             <span class="q-type">${typeLabel}</span>
-            <strong>${escapeHtml(item.index)}. ${escapeHtml(item.word)}</strong>
-            <span class="q-phonetic">${escapeHtml(item.phonetic || '')}</span>
+            <strong>${escapeHtml(item.index)}. ${escapeHtml(getQuestionPrompt(item))}</strong>
+            ${getDetailPhoneticHtml(item)}
           </div>
           <div>答案：${escapeHtml(item.answer || '（空）')}</div>
-          <div>正确：${escapeHtml(item.direction === 'zhToEn' ? item.word : item.meaning)}</div>
+          <div>正确：${escapeHtml(getCorrectAnswer(item))}</div>
         </div>
       `;
     }).join('');
@@ -496,11 +508,11 @@ function submitExam(isAuto = false) {
       <div class="detail-head">
         <span class="status-tag ${item.status}">${label}</span>
         <span class="q-type">${typeLabel}</span>
-        <strong>${item.index}. ${item.word}</strong>
-        <span class="q-phonetic">${item.phonetic || ''}</span>
+        <strong>${escapeHtml(item.index)}. ${escapeHtml(getQuestionPrompt(item))}</strong>
+        ${getDetailPhoneticHtml(item)}
       </div>
-      <div>你的答案：${item.answer || '（空）'}</div>
-      <div>正确释义：${item.meaning}</div>
+      <div>你的答案：${escapeHtml(item.answer || '（空）')}</div>
+      <div>正确答案：${escapeHtml(getCorrectAnswer(item))}</div>
     `;
     list.appendChild(div);
   });

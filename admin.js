@@ -13,6 +13,8 @@ function escapeHtml(str) {
 
 function statusLabel(status) {
   if (status === "correct") return "对";
+  if (status === "reviewCorrect") return "规则复核对";
+  if (status === "aiReviewCorrect") return "AI复核对";
   if (status === "wrong") return "错";
   return "未答";
 }
@@ -32,7 +34,7 @@ function render(records) {
 
   records.forEach((r) => {
     const details = Array.isArray(r.details) ? r.details : [];
-    const correctCount = details.filter((x) => x.status === "correct").length;
+    const correctCount = details.filter((x) => ["correct", "reviewCorrect", "aiReviewCorrect"].includes(x.status)).length;
 
     const detailHtml = details
       .map(

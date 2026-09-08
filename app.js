@@ -83,6 +83,14 @@ function getSupabaseClient() {
   return window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
 }
 
+function getSupabaseFunctionUrl(name) {
+  const cfg = window.APP_CONFIG || {};
+  if (!cfg.supabaseUrl || !cfg.supabaseAnonKey || cfg.supabaseUrl.includes('YOUR_')) {
+    return '';
+  }
+  return `${cfg.supabaseUrl.replace(/\/+$/, '')}/functions/v1/${name}`;
+}
+
 function getOrCreateClientId() {
   try {
     const existing = localStorage.getItem(CLIENT_ID_KEY);
@@ -249,6 +257,63 @@ function judgeAnswer(answer, question) {
   return 'wrong';
 }
 
+async function reviewAnswersWithAI(detailList) {
+  const cfg = window.APP_CONFIG || {};
+  const functionUrl = getSupabaseFunctionUrl('review-answers');
+  if (!cfg.aiReviewEnabled || !functionUrl || !cfg.supabaseAnonKey) {
+    return { aiReviewed: 0, aiCorrect: 0, skipped: true };
+  }
+
+  const pending = detailList
+    .filter(item => item.direction === 'enToZh' && item.status === 'wrong' && normalize(item.answer).length > 0)
+    .map(item => ({
+      index: item.index,
+      word: item.word,
+      answer: item.answer,
+      meaning: item.meaning
+    }));
+
+  if (!pending.length) {
+    return { aiReviewed: 0, aiCorrect: 0, skipped: false };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const res = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'apikey': cfg.supabaseAnonKey,
+        'Authorization': `Bearer ${cfg.supabaseAnonKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ items: pending }),
+      signal: controller.signal
+    });
+
+    if (!res.ok) throw new Error(`AI复核接口返回 ${res.status}`);
+    const data = await res.json();
+    const resultMap = new Map((data.results || []).map(item => [Number(item.index), item]));
+    let aiCorrect = 0;
+
+    detailList.forEach(item => {
+      const result = resultMap.get(Number(item.index));
+      if (!result) return;
+      item.ai_reviewed = true;
+      item.ai_review_reason = result.reason || '';
+      if (result.correct) {
+        item.status = 'aiReviewCorrect';
+        aiCorrect += 1;
+      }
+    });
+
+    return { aiReviewed: pending.length, aiCorrect, skipped: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function isWordCorrect(answer, word) {
   return normalize(answer) === normalize(word);
 }
@@ -376,7 +441,7 @@ function applyMode(mode) {
   populateGroups();
 }
 
-async function uploadResult(payload) {
+async function uploadResult(payload, reviewWarning = '') {
   const statusEl = el('uploadState');
   if (statusEl) {
     statusEl.textContent = '成绩上传状态：上传中...';
@@ -389,7 +454,7 @@ async function uploadResult(payload) {
       statusEl.textContent = '成绩上传状态：未配置 Supabase（请填写 config.js）';
       statusEl.className = 'upload-state warn';
     }
-    return;
+    return false;
   }
 
   let { error } = await client.from('exam_results').insert(payload);
@@ -403,13 +468,14 @@ async function uploadResult(payload) {
       statusEl.textContent = `成绩上传状态：失败（${error.message}）`;
       statusEl.className = 'upload-state fail';
     }
-    return;
+    return false;
   }
 
   if (statusEl) {
-    statusEl.textContent = '成绩上传状态：已上传';
+    statusEl.textContent = reviewWarning ? `成绩上传状态：已上传；${reviewWarning}` : '成绩上传状态：已上传';
     statusEl.className = 'upload-state ok';
   }
+  return true;
 }
 
 function getRecordMode(record) {
@@ -430,6 +496,7 @@ function getRecordModeLabel(record) {
 function getReviewedDetails(record) {
   const details = Array.isArray(record.details) ? record.details : [];
   return details.map(item => {
+    if (item.status === 'aiReviewCorrect') return item;
     const answer = item.answer || '';
     const answered = normalize(answer).length > 0;
     return {
@@ -446,12 +513,13 @@ function getRecordCorrectCount(record) {
 }
 
 function isDetailCorrect(item) {
-  return item.status === 'correct' || item.status === 'reviewCorrect';
+  return item.status === 'correct' || item.status === 'reviewCorrect' || item.status === 'aiReviewCorrect';
 }
 
 function getStatusLabel(status) {
   if (status === 'correct') return '初判对';
-  if (status === 'reviewCorrect') return '复核对';
+  if (status === 'reviewCorrect') return '规则复核对';
+  if (status === 'aiReviewCorrect') return 'AI复核对';
   if (status === 'wrong') return '错';
   return '未答';
 }
@@ -494,6 +562,7 @@ function renderHistory(records) {
     const score = total ? Math.round(correct / total * 100) : 0;
     const wrongCount = details.filter(item => !isDetailCorrect(item)).length;
     const reviewCorrectCount = details.filter(item => item.status === 'reviewCorrect').length;
+    const aiReviewCorrectCount = details.filter(item => item.status === 'aiReviewCorrect').length;
     const modeLabel = getRecordModeLabel(record);
     const detailHtml = details.map(item => {
       const typeLabel = item.direction === 'zhToEn' ? '汉译英' : '英译汉';
@@ -522,7 +591,7 @@ function renderHistory(records) {
         <span class="meta-split">|</span>
         ${correct} / ${total}
         <span class="meta-split">|</span>
-        复核对 ${reviewCorrectCount}
+        复核对 ${reviewCorrectCount + aiReviewCorrectCount}
         <span class="meta-split">|</span>
         错/未答 ${wrongCount}
         <span class="meta-split">|</span>
@@ -577,7 +646,34 @@ async function loadHistory() {
   renderHistory(records);
 }
 
-function submitExam(isAuto = false) {
+function renderResult(detailList, activeExam, total, correct, initialCorrect, reviewCorrect, aiReviewCorrect, used, endTime, isAuto) {
+  el('scoreText').textContent = `得分：${correct} / ${total}（初判正确 ${initialCorrect}，规则复核 ${reviewCorrect}，AI复核 ${aiReviewCorrect}）`;
+  el('metaText').innerHTML = `<span class="time-strong">交卷时间：${formatDateTime(endTime)}</span> <span class="meta-split">|</span> 模式：${activeExam.label} <span class="meta-split">|</span> 组别：第 ${state.currentGroup} 组 <span class="meta-split">|</span> 用时：${used} <span class="meta-split">|</span> ${isAuto ? '已到时间自动交卷' : '手动交卷'}`;
+
+  const list = el('wrongList');
+  list.innerHTML = '';
+  detailList.forEach(item => {
+    const div = document.createElement('div');
+    div.className = `wrong-item ${item.status}`;
+    const label = getStatusLabel(item.status);
+    const typeLabel = item.direction === 'zhToEn' ? '汉译英' : '英译汉';
+    const reviewReason = item.ai_review_reason ? `<div class="review-reason">AI复核：${escapeHtml(item.ai_review_reason)}</div>` : '';
+    div.innerHTML = `
+      <div class="detail-head">
+        <span class="status-tag ${item.status}">${label}</span>
+        <span class="q-type">${typeLabel}</span>
+        <strong>${escapeHtml(item.index)}. ${escapeHtml(getQuestionPrompt(item))}</strong>
+        ${getDetailPhoneticHtml(item)}
+      </div>
+      <div>你的答案：${escapeHtml(item.answer || '（空）')}</div>
+      <div>正确答案：${escapeHtml(getCorrectAnswer(item))}</div>
+      ${reviewReason}
+    `;
+    list.appendChild(div);
+  });
+}
+
+async function submitExam(isAuto = false) {
   if (state.submitted) return;
   state.submitted = true;
   stopTimer();
@@ -590,6 +686,7 @@ function submitExam(isAuto = false) {
   let correct = 0;
   let initialCorrect = 0;
   let reviewCorrect = 0;
+  let aiReviewCorrect = 0;
   const detailList = [];
 
   state.questions.forEach((q, idx) => {
@@ -598,7 +695,6 @@ function submitExam(isAuto = false) {
     const status = answered ? judgeAnswer(ans, q) : 'blank';
     if (status === 'correct') initialCorrect += 1;
     if (status === 'reviewCorrect') reviewCorrect += 1;
-    if (isDetailCorrect({ status })) correct += 1;
     detailList.push({
       index: idx + 1,
       direction: q.direction,
@@ -614,33 +710,40 @@ function submitExam(isAuto = false) {
   const used = formatTime(elapsed);
   const endTime = new Date();
 
-  el('scoreText').textContent = `得分：${correct} / ${total}（初判正确 ${initialCorrect}，复核正确 ${reviewCorrect}）`;
-  el('metaText').innerHTML = `<span class="time-strong">交卷时间：${formatDateTime(endTime)}</span> <span class="meta-split">|</span> 模式：${activeExam.label} <span class="meta-split">|</span> 组别：第 ${state.currentGroup} 组 <span class="meta-split">|</span> 用时：${used} <span class="meta-split">|</span> ${isAuto ? '已到时间自动交卷' : '手动交卷'}`;
-
-  const list = el('wrongList');
-  list.innerHTML = '';
-  detailList.forEach(item => {
-    const div = document.createElement('div');
-    div.className = `wrong-item ${item.status}`;
-    const label = getStatusLabel(item.status);
-    const typeLabel = item.direction === 'zhToEn' ? '汉译英' : '英译汉';
-    div.innerHTML = `
-      <div class="detail-head">
-        <span class="status-tag ${item.status}">${label}</span>
-        <span class="q-type">${typeLabel}</span>
-        <strong>${escapeHtml(item.index)}. ${escapeHtml(getQuestionPrompt(item))}</strong>
-        ${getDetailPhoneticHtml(item)}
-      </div>
-      <div>你的答案：${escapeHtml(item.answer || '（空）')}</div>
-      <div>正确答案：${escapeHtml(getCorrectAnswer(item))}</div>
-    `;
-    list.appendChild(div);
-  });
-
   el('quiz').classList.add('hidden');
   el('result').classList.remove('hidden');
 
-  uploadResult({
+  const statusEl = el('uploadState');
+  if (statusEl) {
+    statusEl.textContent = '成绩上传状态：AI复核中...';
+    statusEl.className = 'upload-state pending';
+  }
+
+  let reviewInfo = null;
+  let reviewWarning = '';
+  try {
+    reviewInfo = await reviewAnswersWithAI(detailList);
+  } catch (error) {
+    reviewWarning = `AI复核失败，已使用本地复核结果（${error.message}）`;
+    if (statusEl) {
+      statusEl.textContent = `成绩上传状态：${reviewWarning}`;
+      statusEl.className = 'upload-state warn';
+    }
+  }
+
+  correct = detailList.filter(isDetailCorrect).length;
+  initialCorrect = detailList.filter(item => item.status === 'correct').length;
+  reviewCorrect = detailList.filter(item => item.status === 'reviewCorrect').length;
+  aiReviewCorrect = detailList.filter(item => item.status === 'aiReviewCorrect').length;
+
+  renderResult(detailList, activeExam, total, correct, initialCorrect, reviewCorrect, aiReviewCorrect, used, endTime, isAuto);
+
+  if (statusEl && reviewInfo && !reviewInfo.skipped) {
+    statusEl.textContent = `成绩上传状态：AI已复核 ${reviewInfo.aiReviewed} 题，上传中...`;
+    statusEl.className = 'upload-state pending';
+  }
+
+  await uploadResult({
     exam_mode: activeExam.mode,
     exam_mode_label: activeExam.label,
     group_no: state.currentGroup,
@@ -651,7 +754,7 @@ function submitExam(isAuto = false) {
     submit_time: formatDateTime(endTime),
     details: detailList,
     ...getClientInfo()
-  });
+  }, reviewWarning);
 }
 
 function startExam() {

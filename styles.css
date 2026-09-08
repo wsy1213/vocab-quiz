@@ -157,6 +157,7 @@ button.primary:hover { opacity: 0.92; }
 .dot.unanswered { background: #f0c26c; }
 .dot.correct { background: #7cc7a3; }
 .dot.reviewCorrect { background: #8fb7e8; }
+.dot.aiReviewCorrect { background: #b9a2e8; }
 .dot.wrong { background: #e18888; }
 .dot.blank { background: #f0c26c; }
 
@@ -233,6 +234,7 @@ button.primary:hover { opacity: 0.92; }
 
 .status-tag.correct { background: #7cc7a3; color: #143a2b; }
 .status-tag.reviewCorrect { background: #8fb7e8; color: #143052; }
+.status-tag.aiReviewCorrect { background: #b9a2e8; color: #2f205c; }
 .status-tag.wrong { background: #e18888; color: #3b0e0e; }
 .status-tag.blank { background: #f0c26c; color: #3a2a05; }
 
@@ -260,8 +262,15 @@ button.primary:hover { opacity: 0.92; }
 
 .wrong-item.correct { border-color: #9bd3c7; background: #edf8f3; }
 .wrong-item.reviewCorrect { border-color: #9dbfe8; background: #eef5ff; }
+.wrong-item.aiReviewCorrect { border-color: #c8b5f0; background: #f4f0ff; }
 .wrong-item.wrong { border-color: #e0a0a0; background: #fdecec; }
 .wrong-item.blank { border-color: #f0c26c; background: #fff6e3; }
+
+.review-reason {
+  color: #5a4b86;
+  font-size: 13px;
+  margin-top: 2px;
+}
 
 .detail-head {
   display: flex;
@@ -336,6 +345,7 @@ button.primary:hover { opacity: 0.92; }
 
 .history-detail.correct { border-color: #9bd3c7; background: #edf8f3; }
 .history-detail.reviewCorrect { border-color: #9dbfe8; background: #eef5ff; }
+.history-detail.aiReviewCorrect { border-color: #c8b5f0; background: #f4f0ff; }
 .history-detail.wrong { border-color: #e0a0a0; background: #fdecec; }
 .history-detail.blank { border-color: #f0c26c; background: #fff6e3; }
 

@@ -4,7 +4,7 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const CORRECT_STATUSES = new Set(["correct", "reviewCorrect", "aiReviewCorrect"]);
+const CORRECT_STATUSES = new Set(["correct", "aiReviewCorrect"]);
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -35,65 +35,11 @@ function isInitiallyCorrect(answer: unknown, meaning: unknown) {
   return buildMeaningTokens(meaning).some(t => t && (t.includes(a) || a.includes(t)));
 }
 
-const meaningSynonymGroups = [
-  ["聪明", "智慧", "智力", "才智", "理智"],
-  ["准确", "正确", "精确", "精密"],
-  ["重要", "主要", "关键"],
-  ["大概", "大约", "可能"],
-  ["解释", "说明", "阐明"],
-  ["管理", "控制", "支配"],
-];
-
-const meaningSynonyms = meaningSynonymGroups.reduce<Record<string, string[]>>((map, group) => {
-  group.forEach(term => {
-    map[term] = group;
-  });
-  return map;
-}, {});
-
-function extractChineseTerms(text: unknown) {
-  return String(text || "")
-    .replace(/[a-zA-Z.&]+/g, " ")
-    .replace(/[()（）[\]{}<>《》]/g, " ")
-    .split(/[\s;；。.,，、/\\|:：!?！？]+/)
-    .flatMap(part => part.match(/[\u4e00-\u9fff]+/g) || [])
-    .map(term => term.replace(/^的+|的+$/g, ""))
-    .filter(term => term.length >= 2);
-}
-
-function hasSynonymMatch(answerTerm: string, standardTerm: string) {
-  const answerVariants = meaningSynonyms[answerTerm] || [answerTerm];
-  const standardVariants = meaningSynonyms[standardTerm] || [standardTerm];
-  return answerVariants.some(item => standardVariants.includes(item));
-}
-
-function hasCloseChineseOverlap(answerTerm: string, standardTerm: string) {
-  const a = [...new Set(answerTerm.split(""))];
-  const b = [...new Set(standardTerm.split(""))];
-  const common = a.filter(ch => b.includes(ch)).length;
-  const minLen = Math.min(a.length, b.length);
-  const maxLen = Math.max(a.length, b.length);
-  return minLen >= 2 && common / minLen >= 0.75 && common / maxLen >= 0.5;
-}
-
-function isReviewCorrect(answer: unknown, meaning: unknown) {
-  const answerTerms = extractChineseTerms(answer);
-  const standardTerms = extractChineseTerms(meaning);
-  if (!answerTerms.length || !standardTerms.length) return false;
-  return answerTerms.some(answerTerm => standardTerms.some(standardTerm => (
-    answerTerm.includes(standardTerm) ||
-    standardTerm.includes(answerTerm) ||
-    hasSynonymMatch(answerTerm, standardTerm) ||
-    hasCloseChineseOverlap(answerTerm, standardTerm)
-  )));
-}
-
 function judgeAnswer(answer: unknown, item: any) {
   if (item.direction === "zhToEn") {
     return normalize(answer) === normalize(item.word) ? "correct" : "wrong";
   }
   if (isInitiallyCorrect(answer, item.meaning)) return "correct";
-  if (isReviewCorrect(answer, item.meaning)) return "reviewCorrect";
   return "wrong";
 }
 
@@ -204,10 +150,10 @@ Deno.serve(async (req) => {
   if (!updateRes.ok) return jsonResponse({ error: await updateRes.text() }, 502);
 
   return jsonResponse({
+    scoring_version: "initial-plus-ai-v2",
     record_id: recordId,
     correct_count: correctCount,
     initial_correct: details.filter((item: any) => item.status === "correct").length,
-    rule_review_correct: details.filter((item: any) => item.status === "reviewCorrect").length,
     ai_review_correct: details.filter((item: any) => item.status === "aiReviewCorrect").length,
     wrong_or_blank: details.filter((item: any) => !CORRECT_STATUSES.has(item.status)).length,
     ai_results: aiResults,

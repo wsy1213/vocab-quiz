@@ -165,95 +165,11 @@ function isInitiallyCorrect(answer, meaning) {
   return tokens.some(t => t && (t.includes(a) || a.includes(t)));
 }
 
-const MEANING_SYNONYM_GROUPS = [
-  ['聪明', '智慧', '智力', '才智', '理智'],
-  ['准确', '正确', '精确', '精密'],
-  ['错误', '不正确', '不准确'],
-  ['重要', '主要', '关键'],
-  ['巨大', '庞大', '广大', '广阔'],
-  ['小心', '谨慎', '警惕'],
-  ['帮助', '协助', '辅助'],
-  ['提高', '增加', '增强'],
-  ['减少', '降低', '减小'],
-  ['停止', '终止', '结束'],
-  ['开始', '起始', '开端'],
-  ['困难', '艰难', '困境'],
-  ['危险', '危机', '风险'],
-  ['快乐', '高兴', '愉快'],
-  ['悲伤', '忧郁', '悲哀'],
-  ['害怕', '恐惧', '恐怖'],
-  ['生气', '愤怒', '暴怒'],
-  ['立刻', '立即', '马上'],
-  ['以前', '从前', '先前'],
-  ['以后', '之后', '随后'],
-  ['大概', '大约', '可能'],
-  ['完全', '全部', '整个'],
-  ['证明', '证实', '确认'],
-  ['解释', '说明', '阐明'],
-  ['管理', '控制', '支配'],
-  ['居住', '住', '定居'],
-  ['购买', '订购', '预订'],
-  ['放弃', '抛弃', '遗弃'],
-  ['要求', '请求', '恳求'],
-  ['保护', '护照', '保护措施'],
-  ['装饰', '装饰品', '装饰的']
-];
-
-const MEANING_SYNONYMS = MEANING_SYNONYM_GROUPS.reduce((map, group) => {
-  group.forEach(term => {
-    map[term] = group;
-  });
-  return map;
-}, {});
-
-function extractChineseTerms(text) {
-  const raw = String(text || '')
-    .replace(/[a-zA-Z.&]+/g, ' ')
-    .replace(/[()（）[\]{}<>《》]/g, ' ');
-  return raw
-    .split(/[\s;；。.,，、/\\|:：!?！？]+/)
-    .flatMap(part => part.match(/[\u4e00-\u9fff]+/g) || [])
-    .map(term => term.replace(/^的+|的+$/g, ''))
-    .filter(term => term.length >= 2);
-}
-
-function getTermVariants(term) {
-  return MEANING_SYNONYMS[term] || [term];
-}
-
-function hasSynonymMatch(answerTerm, standardTerm) {
-  const answerVariants = getTermVariants(answerTerm);
-  const standardVariants = getTermVariants(standardTerm);
-  return answerVariants.some(a => standardVariants.includes(a));
-}
-
-function hasCloseChineseOverlap(answerTerm, standardTerm) {
-  const a = [...new Set(answerTerm.split(''))];
-  const b = [...new Set(standardTerm.split(''))];
-  const common = a.filter(ch => b.includes(ch)).length;
-  const minLen = Math.min(a.length, b.length);
-  const maxLen = Math.max(a.length, b.length);
-  return minLen >= 2 && common / minLen >= 0.75 && common / maxLen >= 0.5;
-}
-
-function isReviewCorrect(answer, meaning) {
-  const answerTerms = extractChineseTerms(answer);
-  const standardTerms = extractChineseTerms(meaning);
-  if (!answerTerms.length || !standardTerms.length) return false;
-  return answerTerms.some(answerTerm => standardTerms.some(standardTerm => (
-    answerTerm.includes(standardTerm) ||
-    standardTerm.includes(answerTerm) ||
-    hasSynonymMatch(answerTerm, standardTerm) ||
-    hasCloseChineseOverlap(answerTerm, standardTerm)
-  )));
-}
-
 function judgeAnswer(answer, question) {
   if (question.direction === 'zhToEn') {
     return isWordCorrect(answer, question.word) ? 'correct' : 'wrong';
   }
   if (isInitiallyCorrect(answer, question.meaning)) return 'correct';
-  if (isReviewCorrect(answer, question.meaning)) return 'reviewCorrect';
   return 'wrong';
 }
 
@@ -513,12 +429,11 @@ function getRecordCorrectCount(record) {
 }
 
 function isDetailCorrect(item) {
-  return item.status === 'correct' || item.status === 'reviewCorrect' || item.status === 'aiReviewCorrect';
+  return item.status === 'correct' || item.status === 'aiReviewCorrect';
 }
 
 function getStatusLabel(status) {
   if (status === 'correct') return '初判对';
-  if (status === 'reviewCorrect') return '规则复核对';
   if (status === 'aiReviewCorrect') return 'AI复核对';
   if (status === 'wrong') return '错';
   return '未答';
@@ -561,7 +476,6 @@ function renderHistory(records) {
     const total = Number(record.total_count) || details.length || 0;
     const score = total ? Math.round(correct / total * 100) : 0;
     const wrongCount = details.filter(item => !isDetailCorrect(item)).length;
-    const reviewCorrectCount = details.filter(item => item.status === 'reviewCorrect').length;
     const aiReviewCorrectCount = details.filter(item => item.status === 'aiReviewCorrect').length;
     const modeLabel = getRecordModeLabel(record);
     const detailHtml = details.map(item => {
@@ -591,7 +505,7 @@ function renderHistory(records) {
         <span class="meta-split">|</span>
         ${correct} / ${total}
         <span class="meta-split">|</span>
-        复核对 ${reviewCorrectCount + aiReviewCorrectCount}
+        AI复核对 ${aiReviewCorrectCount}
         <span class="meta-split">|</span>
         错/未答 ${wrongCount}
         <span class="meta-split">|</span>
@@ -646,8 +560,8 @@ async function loadHistory() {
   renderHistory(records);
 }
 
-function renderResult(detailList, activeExam, total, correct, initialCorrect, reviewCorrect, aiReviewCorrect, used, endTime, isAuto) {
-  el('scoreText').textContent = `得分：${correct} / ${total}（初判正确 ${initialCorrect}，规则复核 ${reviewCorrect}，AI复核 ${aiReviewCorrect}）`;
+function renderResult(detailList, activeExam, total, correct, initialCorrect, aiReviewCorrect, used, endTime, isAuto) {
+  el('scoreText').textContent = `得分：${correct} / ${total}（初判正确 ${initialCorrect}，AI复核 ${aiReviewCorrect}）`;
   el('metaText').innerHTML = `<span class="time-strong">交卷时间：${formatDateTime(endTime)}</span> <span class="meta-split">|</span> 模式：${activeExam.label} <span class="meta-split">|</span> 组别：第 ${state.currentGroup} 组 <span class="meta-split">|</span> 用时：${used} <span class="meta-split">|</span> ${isAuto ? '已到时间自动交卷' : '手动交卷'}`;
 
   const list = el('wrongList');
@@ -685,7 +599,6 @@ async function submitExam(isAuto = false) {
   const total = state.questions.length;
   let correct = 0;
   let initialCorrect = 0;
-  let reviewCorrect = 0;
   let aiReviewCorrect = 0;
   const detailList = [];
 
@@ -694,7 +607,6 @@ async function submitExam(isAuto = false) {
     const answered = normalize(ans).length > 0;
     const status = answered ? judgeAnswer(ans, q) : 'blank';
     if (status === 'correct') initialCorrect += 1;
-    if (status === 'reviewCorrect') reviewCorrect += 1;
     detailList.push({
       index: idx + 1,
       direction: q.direction,
@@ -733,10 +645,9 @@ async function submitExam(isAuto = false) {
 
   correct = detailList.filter(isDetailCorrect).length;
   initialCorrect = detailList.filter(item => item.status === 'correct').length;
-  reviewCorrect = detailList.filter(item => item.status === 'reviewCorrect').length;
   aiReviewCorrect = detailList.filter(item => item.status === 'aiReviewCorrect').length;
 
-  renderResult(detailList, activeExam, total, correct, initialCorrect, reviewCorrect, aiReviewCorrect, used, endTime, isAuto);
+  renderResult(detailList, activeExam, total, correct, initialCorrect, aiReviewCorrect, used, endTime, isAuto);
 
   if (statusEl && reviewInfo && !reviewInfo.skipped) {
     statusEl.textContent = `成绩上传状态：AI已复核 ${reviewInfo.aiReviewed} 题，上传中...`;

@@ -10,7 +10,8 @@ const state = {
   sampleCount: 100,
   timerId: null,
   startTime: null,
-  submitted: false
+  submitted: false,
+  activeExam: null
 };
 
 const el = (id) => document.getElementById(id);
@@ -322,8 +323,8 @@ async function uploadResult(payload) {
 function getRecordMode(record) {
   if (record.exam_mode) return record.exam_mode;
   const details = Array.isArray(record.details) ? record.details : [];
-  const hasMixedReviewType = details.some(item => item.direction === 'zhToEn' || item.direction === 'enToZh');
-  if (!hasMixedReviewType) return '';
+  const hasHanToEng = details.some(item => item.direction === 'zhToEn');
+  if (!hasHanToEng) return '';
   if (Number(record.total_count) === 60) return 'cet4ReviewWlh';
   if (Number(record.total_count) === 100) return 'cet4ReviewQxh';
   return '';
@@ -450,6 +451,10 @@ function submitExam(isAuto = false) {
   if (state.submitted) return;
   state.submitted = true;
   stopTimer();
+  const activeExam = state.activeExam || {
+    mode: state.mode,
+    label: getModeConfig().label
+  };
 
   const total = state.questions.length;
   let correct = 0;
@@ -478,8 +483,7 @@ function submitExam(isAuto = false) {
   const endTime = new Date();
 
   el('scoreText').textContent = `得分：${correct} / ${total}`;
-  const cfg = getModeConfig();
-  el('metaText').innerHTML = `<span class="time-strong">交卷时间：${formatDateTime(endTime)}</span> <span class="meta-split">|</span> 模式：${cfg.label} <span class="meta-split">|</span> 组别：第 ${state.currentGroup} 组 <span class="meta-split">|</span> 用时：${used} <span class="meta-split">|</span> ${isAuto ? '已到时间自动交卷' : '手动交卷'}`;
+  el('metaText').innerHTML = `<span class="time-strong">交卷时间：${formatDateTime(endTime)}</span> <span class="meta-split">|</span> 模式：${activeExam.label} <span class="meta-split">|</span> 组别：第 ${state.currentGroup} 组 <span class="meta-split">|</span> 用时：${used} <span class="meta-split">|</span> ${isAuto ? '已到时间自动交卷' : '手动交卷'}`;
 
   const list = el('wrongList');
   list.innerHTML = '';
@@ -505,8 +509,8 @@ function submitExam(isAuto = false) {
   el('result').classList.remove('hidden');
 
   uploadResult({
-    exam_mode: state.mode,
-    exam_mode_label: cfg.label,
+    exam_mode: activeExam.mode,
+    exam_mode_label: activeExam.label,
     group_no: state.currentGroup,
     total_count: total,
     correct_count: correct,
@@ -523,6 +527,10 @@ function startExam() {
   const cfg = getModeConfig();
   const groupNo = Number(el('groupSelect').value);
   state.currentGroup = groupNo;
+  state.activeExam = {
+    mode: state.mode,
+    label: cfg.label
+  };
   state.sampleCount = cfg.sampleDisabled
     ? cfg.sampleDefault
     : Math.min(cfg.sampleMax, Math.max(1, Number(el('sampleCount').value) || cfg.sampleDefault));

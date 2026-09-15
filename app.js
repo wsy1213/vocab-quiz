@@ -463,18 +463,17 @@ function renderHistory(records) {
   }
 
   const totalExams = records.length;
-  const avgScore = Math.round(records.reduce((sum, r) => {
+  const avgRate = Math.round(records.reduce((sum, r) => {
     const total = Number(r.total_count) || 0;
     return sum + (total ? getRecordCorrectCount(r) / total * 100 : 0);
   }, 0) / totalExams);
   const latest = records[0];
-  summary.textContent = `共 ${totalExams} 次记录，平均 ${avgScore} 分；最近一次：${getRecordModeLabel(latest)} 第 ${Number(latest.group_no) || '-'} 组`;
+  summary.textContent = `共 ${totalExams} 次记录，平均得分率 ${avgRate}%；最近一次：${getRecordModeLabel(latest)} 第 ${Number(latest.group_no) || '-'} 组`;
 
   records.forEach(record => {
     const details = getReviewedDetails(record);
     const correct = getRecordCorrectCount(record);
     const total = Number(record.total_count) || details.length || 0;
-    const score = total ? Math.round(correct / total * 100) : 0;
     const wrongCount = details.filter(item => !isDetailCorrect(item)).length;
     const aiReviewCorrectCount = details.filter(item => item.status === 'aiReviewCorrect').length;
     const modeLabel = getRecordModeLabel(record);
@@ -498,7 +497,7 @@ function renderHistory(records) {
     wrap.className = 'history-record';
     wrap.innerHTML = `
       <summary>
-        <span class="history-score">${score} 分</span>
+        <span class="history-score">${correct} 分</span>
         <strong>${escapeHtml(modeLabel)}</strong>
         <span class="meta-split">|</span>
         第 ${Number(record.group_no) || '-'} 组

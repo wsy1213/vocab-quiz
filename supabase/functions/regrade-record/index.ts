@@ -54,6 +54,7 @@ async function reviewWithDeepSeek(items: any[], apiKey: string) {
     "判断学生中文答案是否表达了英文单词在标准释义中的任意一个核心含义。",
     "只要等价、近义或常见说法一致就判 correct=true；不要求写出全部释义或词性标签。",
     "但必须检查答案表达的词性和用法是否与标准释义匹配；标准只有名词/动词时，学生答成形容词等明显词性错位的，不算对。",
+    "学生中文答案如果出现明显错别字，不能算对；例如 hostess 的标准释义为“女主人/空姐”，学生答“女朱人”，应判 correct=false。",
     "例如 cripple 的标准释义若为“n.跛子/残废的人；v.使成残废/削弱”，学生只答“残疾的”，应判 correct=false。",
     "必须只返回 JSON：{\"results\":[{\"index\":题号,\"correct\":true或false,\"reason\":\"不超过20字的中文理由\"}]}。",
     JSON.stringify(items, null, 2),

@@ -586,6 +586,27 @@ function renderResult(detailList, activeExam, total, correct, initialCorrect, ai
   });
 }
 
+function showSetupView() {
+  el('setup').classList.remove('hidden');
+  el('history').classList.remove('hidden');
+  el('quiz').classList.add('hidden');
+  el('result').classList.add('hidden');
+}
+
+function showQuizView() {
+  el('setup').classList.add('hidden');
+  el('history').classList.add('hidden');
+  el('result').classList.add('hidden');
+  el('quiz').classList.remove('hidden');
+}
+
+function showResultView() {
+  el('setup').classList.add('hidden');
+  el('history').classList.add('hidden');
+  el('quiz').classList.add('hidden');
+  el('result').classList.remove('hidden');
+}
+
 async function submitExam(isAuto = false) {
   if (state.submitted) return;
   state.submitted = true;
@@ -621,8 +642,7 @@ async function submitExam(isAuto = false) {
   const used = formatTime(elapsed);
   const endTime = new Date();
 
-  el('quiz').classList.add('hidden');
-  el('result').classList.remove('hidden');
+  showResultView();
 
   const statusEl = el('uploadState');
   if (statusEl) {
@@ -689,9 +709,7 @@ function startExam() {
   state.questions = buildQuestions(groupItems, pickCount, cfg);
   state.answers = Array(state.questions.length).fill('');
 
-  el('setup').classList.add('hidden');
-  el('result').classList.add('hidden');
-  el('quiz').classList.remove('hidden');
+  showQuizView();
 
   renderQuestions();
   renderDirectory();
@@ -716,6 +734,7 @@ async function init() {
   };
 
   applyMode(el('modeSelect').value || 'cet4');
+  showSetupView();
 
   el('modeSelect').addEventListener('change', (e) => applyMode(e.target.value));
   el('historyRefreshBtn').addEventListener('click', loadHistory);
@@ -726,8 +745,7 @@ async function init() {
     if (confirm('确定要交卷吗？')) submitExam(false);
   });
   el('restartBtn').addEventListener('click', () => {
-    el('result').classList.add('hidden');
-    el('setup').classList.remove('hidden');
+    showSetupView();
     el('timer').textContent = formatTime(state.durationMin * 60);
     const statusEl = el('uploadState');
     if (statusEl) {
